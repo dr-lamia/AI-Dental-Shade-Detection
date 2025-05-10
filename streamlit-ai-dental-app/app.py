@@ -95,6 +95,6 @@ if image is not None:
         deltaE_val = calculate_delta_e(st.session_state["prev_lab"], lab) if st.session_state["prev_lab"] else 0.0
         pdf = generate_pdf_report(lab, vita, deltaE_val)
         if pdf:
-        st.download_button("📄 Download PDF", data=pdf, file_name="shade_report.pdf", mime="application/pdf")
-    else:
-        st.error("PDF generation failed. Please make sure you uploaded an image.")
+    st.download_button("📄 Download PDF", data=pdf, file_name="shade_report.pdf", mime="application/pdf")
+else:
+    st.error("PDF generation failed. Please make sure you uploaded an image.")
