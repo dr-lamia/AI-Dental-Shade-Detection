@@ -1,6 +1,5 @@
 
 import streamlit as st
-import cv2
 import matplotlib.pyplot as plt
 from PIL import Image
 from skimage import color
@@ -61,24 +60,10 @@ def generate_pdf_report(lab, vita, deltaE):
     buffer.seek(0)
     return buffer
 
-st.subheader("📸 Input Options")
-tab1, tab2 = st.tabs(["📁 Upload Image", "📷 Use Camera"])
-with tab1:
-    uploaded_image = st.file_uploader("Upload Image", type=["jpg", "png", "jpeg"])
+st.subheader("📁 Upload Image")
+uploaded_image = st.file_uploader("Upload Image", type=["jpg", "png", "jpeg"])
 if uploaded_image:
     image = Image.open(uploaded_image).convert("RGB")
-
-with tab2:
-    capture = st.button("Capture from Webcam")
-    image = None
-    if capture:
-        cap = cv2.VideoCapture(0)
-        ret, frame = cap.read()
-        if ret:
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            image = Image.fromarray(frame)
-            st.image(image, caption="Captured Image", use_column_width=True)
-        cap.release()
 
 if image:
     st.image(image, caption="Uploaded Image", use_column_width=True)
@@ -112,4 +97,3 @@ if image:
         deltaE_val = calculate_delta_e(st.session_state["prev_lab"], lab) if st.session_state["prev_lab"] else 0.0
         pdf = generate_pdf_report(lab, vita, deltaE_val)
         st.download_button("📄 Download PDF", data=pdf, file_name="shade_report.pdf", mime="application/pdf")
-
