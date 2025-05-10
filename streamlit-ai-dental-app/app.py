@@ -1,4 +1,3 @@
-
 import streamlit as st
 import matplotlib.pyplot as plt
 from PIL import Image
@@ -92,11 +91,12 @@ if image is not None:
     ax.imshow(lab_img[:, :, 0], cmap='plasma')
     st.pyplot(fig)
 
-    if st.button("Download PDF Report"):
-    if lab and vita:
+    
+if st.button("Download PDF Report"):
+    if lab is not None and vita is not None:
         deltaE_val = calculate_delta_e(st.session_state["prev_lab"], lab) if st.session_state["prev_lab"] else 0.0
         pdf = generate_pdf_report(lab, vita, deltaE_val)
-        if pdf:
+        if pdf is not None:
             st.download_button("📄 Download PDF", data=pdf, file_name="shade_report.pdf", mime="application/pdf")
         else:
             st.error("PDF generation failed.")
