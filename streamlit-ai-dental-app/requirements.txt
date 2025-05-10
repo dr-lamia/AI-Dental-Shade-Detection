@@ -3,3 +3,4 @@ pillow
 numpy
 scikit-image
 reportlab
+matplotlib
