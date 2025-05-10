@@ -61,11 +61,12 @@ def generate_pdf_report(lab, vita, deltaE):
     return buffer
 
 st.subheader("📁 Upload Image")
-uploaded_image = st.file_uploader("Upload Image", type=["jpg", "png", "jpeg"])
+uploaded_image = st.file_uploader(
+image = None  # Ensure image is defined"Upload Image", type=["jpg", "png", "jpeg"])
 if uploaded_image:
     image = Image.open(uploaded_image).convert("RGB")
 
-if image:
+if image is not None:
     st.image(image, caption="Uploaded Image", use_column_width=True)
     lab = extract_cie_lab(image)
     vita = convert_to_vita(lab)
