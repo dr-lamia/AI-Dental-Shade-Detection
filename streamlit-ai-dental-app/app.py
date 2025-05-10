@@ -1,4 +1,3 @@
-
 import streamlit as st
 import matplotlib.pyplot as plt
 from PIL import Image
@@ -11,9 +10,8 @@ from reportlab.pdfgen import canvas
 st.set_page_config(page_title="AI Dental Shade App", layout="centered")
 
 st.title("🦷 AI Dental Shade Detection")
-st.write("Upload or capture an intraoral image to detect CIE-LAB values and match to VITA Classic or 3D-Master shades.")
+st.write("Upload an intraoral image to detect CIE-LAB values and match to VITA Classic or 3D-Master shades.")
 
-# Sample VITA 3D-Master values for demonstration
 vita_3d_master_shades = {
     "1M1": [99.0, 0.005, 1.5],
     "1M2": [97.2, 0.1, 2.0],
@@ -41,7 +39,7 @@ def extract_cie_lab(pil_img):
     return np.mean(lab_img, axis=(0, 1))
 
 def convert_to_vita(lab):
-    return "A2"  # Placeholder
+    return "A2"
 
 def convert_to_vita_3d(lab):
     return find_closest_vita_3d(lab)
@@ -60,9 +58,8 @@ def generate_pdf_report(lab, vita, deltaE):
     buffer.seek(0)
     return buffer
 
-st.subheader("📁 Upload Image")
-uploaded_image = st.file_uploader(
-image = None  # Ensure image is defined"Upload Image", type=["jpg", "png", "jpeg"])
+uploaded_image = st.file_uploader("Upload Image", type=["jpg", "png", "jpeg"])
+image = None
 if uploaded_image:
     image = Image.open(uploaded_image).convert("RGB")
 
