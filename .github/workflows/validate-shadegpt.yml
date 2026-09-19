@@ -1,0 +1,68 @@
+name: Validate ShadeGPT Streamlit
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [research-validation-v1]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r streamlit-ai-dental-app/requirements.txt
+
+      - name: Compile Python files
+        run: |
+          python -m py_compile streamlit-ai-dental-app/app.py
+          python -m py_compile streamlit-ai-dental-app/shade_engine.py
+
+      - name: Smoke-test shade engine
+        run: |
+          cd streamlit-ai-dental-app
+          python - <<'PY'
+          import numpy as np
+          import pandas as pd
+          from PIL import Image
+          from shade_engine import robust_lab, nearest_shades, shade_map_table, delta_e00
+
+          img = Image.fromarray(np.full((180, 120, 3), [210, 190, 160], dtype=np.uint8), mode="RGB")
+          lab = robust_lab(img)
+          assert np.isfinite([lab.L, lab.a, lab.b]).all()
+
+          refs = pd.DataFrame([
+              {"shade":"2M2","L":lab.L,"a":lab.a,"b":lab.b},
+              {"shade":"3M1","L":lab.L-4,"a":lab.a+1,"b":lab.b+2},
+              {"shade":"4M1","L":lab.L-8,"a":lab.a+2,"b":lab.b+4},
+          ])
+          top = nearest_shades([lab.L, lab.a, lab.b], refs, top_k=3)
+          assert len(top) == 3
+          assert top.iloc[0]["shade"] == "2M2"
+          assert abs(delta_e00([lab.L, lab.a, lab.b], [lab.L, lab.a, lab.b])) < 1e-9
+
+          mapped = shade_map_table(img, refs, "9 zones")
+          assert len(mapped) == 9
+          assert set(mapped["shade"]) <= {"2M2","3M1","4M1"}
+          print("shade_engine smoke test passed")
+          PY
+
+      - name: Start Streamlit app
+        run: |
+          cd streamlit-ai-dental-app
+          set +e
+          timeout 20s streamlit run app.py --server.headless true --server.port 8501 > /tmp/streamlit.log 2>&1
+          code=$?
+          cat /tmp/streamlit.log
+          if [ "$code" -ne 0 ] && [ "$code" -ne 124 ]; then
+            exit "$code"
+          fi
+          grep -q "Local URL" /tmp/streamlit.log
