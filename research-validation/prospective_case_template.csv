@@ -1,0 +1,1 @@
+patient_id,session_id,tooth_fdi,timepoint,camera_file,calibration_target_file,camera_model,lens,focal_length_mm,aperture,shutter_s,iso,white_balance,flash,working_distance_or_magnification,ray_L_1,ray_a_1,ray_b_1,ray_L_2,ray_a_2,ray_b_2,ray_L_3,ray_a_3,ray_b_3,ray_L_mean,ray_a_mean,ray_b_mean,ray_shade,included,exclusion_reason
