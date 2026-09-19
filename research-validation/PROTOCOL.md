@@ -26,11 +26,14 @@ Rayplicker spectrophotometer averaged L*, a*, b* values.
 - agreement of ΔE00(T0→T4) between methods
 
 ## Initial validation set
-Use the currently available full-veneer numeric dataset (17 teeth) with T0 and T4 clinical photographs where a defensible tooth-image match exists.
+Use the currently available full-veneer numeric dataset (17 teeth). Treat the post-treatment clinical photographs as T0 only after verifying that the image acquisition corresponds to the 24-hour post-cementation color assessment. Add T4 only when 12-month clinical photographs can be linked defensibly to the same teeth.
 
-Maximum initial paired tooth-timepoint observations: 34.
+The present Drive folder labels alone do not establish exact photo-to-timepoint synchronization.
 
 The unit of clinical sampling is the patient. Teeth and timepoints are clustered/repeated observations and must not be described as independent patients.
+
+## Negative-control benchmark
+Because the Rayplicker L*a*b* values occupy a narrow color range, a model can appear accurate by predicting an average shade. Every validation run should therefore include a trivial leakage-free comparator: for each held-out patient, predict the mean Rayplicker L*a*b* from the other patient(s). The photographic method should outperform this baseline before claiming useful image-derived signal.
 
 ## Data-lock rules
 1. Do not fit model parameters to these two patients.
