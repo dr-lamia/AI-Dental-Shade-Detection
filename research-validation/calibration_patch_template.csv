@@ -1,0 +1,3 @@
+patch,x0,y0,x1,y1,L,a,b
+# Example only. Replace with measured target patch coordinates and reference CIELAB values.
+# P01,0.10,0.10,0.15,0.15,50.0,0.0,0.0
