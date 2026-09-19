@@ -1,0 +1,2 @@
+patch,x0,y0,x1,y1,L,a,b
+# Coordinates are normalized 0-1. Replace example comments with measured target values.
