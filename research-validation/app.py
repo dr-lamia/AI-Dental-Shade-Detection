@@ -28,7 +28,7 @@ from calibration import (
 from validation_stats import bland_altman, concordance_correlation_coefficient, mae, rmse
 
 
-ALGORITHM_VERSION = "shade-validation-v1.0.0"
+ALGORITHM_VERSION = "shade-validation-v1.1.0"
 REQUIRED_REFERENCE_COLUMNS = ["patient_id", "tooth_fdi", "timepoint", "ray_L", "ray_a", "ray_b"]
 
 
