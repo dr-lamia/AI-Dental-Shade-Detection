@@ -317,6 +317,46 @@ def batch_validation_page():
         )
     st.dataframe(pd.DataFrame(metric_rows), use_container_width=True)
 
+    st.subheader("Negative-control benchmark")
+    patient_ids = sorted(merged["patient_id"].dropna().unique())
+    if len(patient_ids) >= 2:
+        baseline_rows = []
+        for patient_id in patient_ids:
+            train = merged[merged["patient_id"] != patient_id]
+            test = merged[merged["patient_id"] == patient_id]
+            if train.empty or test.empty:
+                continue
+            mean_ref = train[["ray_L", "ray_a", "ray_b"]].mean().to_numpy(dtype=float)
+            for idx, row in test.iterrows():
+                baseline_rows.append(
+                    {
+                        "index": idx,
+                        "baseline_delta_e00": delta_e00(
+                            mean_ref,
+                            [row["ray_L"], row["ray_a"], row["ray_b"]],
+                        ),
+                    }
+                )
+        if baseline_rows:
+            baseline_df = pd.DataFrame(baseline_rows).set_index("index")
+            merged = merged.join(baseline_df)
+            ai_mean = float(merged["delta_e00_ai_vs_ray"].mean())
+            baseline_mean = float(merged["baseline_delta_e00"].mean())
+            b1, b2 = st.columns(2)
+            b1.metric("Photographic mean ΔE00", f"{ai_mean:.2f}")
+            b2.metric("Other-patient mean-color baseline ΔE00", f"{baseline_mean:.2f}")
+            st.caption(
+                "The negative control predicts each patient's teeth using only the mean Rayplicker LAB "
+                "from the other patient. A useful imaging method should outperform this trivial benchmark."
+            )
+            if ai_mean >= baseline_mean:
+                st.warning(
+                    "This batch does not outperform the trivial mean-color benchmark. Do not interpret "
+                    "low calibrated error alone as evidence that the photographs contain useful shade signal."
+                )
+    else:
+        st.info("Negative-control benchmarking requires at least two patient IDs.")
+
     if shade_refs and "ray_shade" in merged.columns:
         valid = merged["ray_shade"].notna()
         if valid.any():
@@ -407,7 +447,9 @@ def protocol_page():
 
 **Primary endpoint:** CIEDE2000 ΔE00 between photographic estimate and Rayplicker for the same tooth/timepoint.
 
-**Initial cohort:** the currently available de-identified full-veneer table contains 17 teeth. Start with T0 and T4 photographs, giving up to 34 paired tooth-timepoint observations.
+**Initial cohort:** the currently available de-identified full-veneer table contains 17 teeth. Begin with the post-cementation/T0 photographic set only after image-to-timepoint provenance is verified. Add T4 only when matching 12-month clinical photographs are confirmed.
+
+**Image provenance:** confirm that each clinical photograph was acquired at the same study timepoint as the Rayplicker reference before treating it as a paired observation. Folder names such as "after" are not sufficient by themselves.
 
 **Do not train on these two patients.** The validation cohort must remain independent of model training or parameter tuning.
 
