@@ -18,6 +18,12 @@ from colorimetry import (
     robust_lab,
     thirds_analysis,
 )
+from calibration import (
+    dataframe_to_matrix,
+    fit_xyz_affine,
+    matrix_to_dataframe,
+    robust_lab_calibrated,
+)
 from validation_stats import bland_altman, concordance_correlation_coefficient, mae, rmse
 
 
@@ -96,6 +102,12 @@ def single_image_page():
         key="shade_ref_single",
         help="Columns: shade, L, a, b. Use measured values from the study setup; do not use invented generic LAB values.",
     )
+    calibration_file = st.file_uploader(
+        "Optional session calibration matrix",
+        type=["csv"],
+        key="cal_matrix_single",
+        help="Use a matrix generated on the Session calibration QC page from the same acquisition session.",
+    )
 
     if uploaded is None:
         return
@@ -136,7 +148,19 @@ def single_image_page():
         )
 
     trim = st.slider("Trim extreme LAB pixels (%)", 0.0, 15.0, 5.0, 0.5)
-    result = robust_lab(roi, trim_percent=trim)
+    if calibration_file is not None:
+        try:
+            calibration_matrix = dataframe_to_matrix(pd.read_csv(calibration_file))
+            result = robust_lab_calibrated(roi, calibration_matrix, trim_percent=trim)
+        except Exception as exc:
+            st.error(f"Calibration matrix could not be applied: {exc}")
+            return
+    else:
+        result = (
+            robust_lab_calibrated(roi, calibration_matrix, trim_percent=trim)
+            if calibration_matrix is not None
+            else robust_lab(roi, trim_percent=trim)
+        )
 
     c1, c2 = st.columns([1, 1])
     with c1:
@@ -199,6 +223,12 @@ def batch_validation_page():
         type=["csv"],
         key="shade_ref_batch",
     )
+    calibration_file = st.file_uploader(
+        "Optional session calibration matrix",
+        type=["csv"],
+        key="cal_matrix_batch",
+        help="Apply only when every uploaded image belongs to the same calibrated camera/flash session.",
+    )
 
     center_fraction = st.slider(
         "Central fraction analyzed inside each pre-cropped tooth image",
@@ -231,6 +261,14 @@ def batch_validation_page():
             shade_refs = load_shade_reference(shade_ref_file)
         except Exception as exc:
             st.error(str(exc))
+            return
+
+    calibration_matrix = None
+    if calibration_file is not None:
+        try:
+            calibration_matrix = dataframe_to_matrix(pd.read_csv(calibration_file))
+        except Exception as exc:
+            st.error(f"Calibration matrix could not be read: {exc}")
             return
 
     image_rows = []
@@ -439,8 +477,88 @@ def batch_validation_page():
     )
 
 
+
+
+def calibration_page():
+    st.header("3. Session calibration QC")
+    st.write(
+        "Fit a session-specific color correction from a photographed multi-patch reference target. "
+        "Use this before analyzing clinical teeth from the same locked camera/flash/white-balance session."
+    )
+    st.info(
+        "The existing thesis photographs reviewed so far do not show a gray card or multi-patch target. "
+        "This page is therefore mainly for prospective/repeat acquisitions or any historical session "
+        "where a calibration-target photograph can be recovered."
+    )
+
+    target = st.file_uploader(
+        "Calibration-target photograph",
+        type=["jpg", "jpeg", "png"],
+        key="cal_target",
+    )
+    spec_file = st.file_uploader(
+        "Patch specification CSV",
+        type=["csv"],
+        key="cal_spec",
+        help="Columns: patch,x0,y0,x1,y1,L,a,b. Coordinates are normalized 0–1.",
+    )
+
+    st.code("patch,x0,y0,x1,y1,L,a,b\nP01,0.10,0.10,0.15,0.15,50.0,0.0,0.0")
+
+    if target is None or spec_file is None:
+        return
+
+    image = Image.open(target).convert("RGB")
+    st.image(image, caption=target.name, use_container_width=True)
+
+    try:
+        spec = pd.read_csv(spec_file)
+        fit = fit_xyz_affine(image, spec)
+    except Exception as exc:
+        st.error(str(exc))
+        return
+
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Mean ΔE00 before", f"{fit.mean_pre_delta_e00:.2f}")
+    c2.metric("Mean ΔE00 after", f"{fit.mean_post_delta_e00:.2f}")
+    c3.metric("Median ΔE00 after", f"{fit.median_post_delta_e00:.2f}")
+    c4.metric("Max ΔE00 after", f"{fit.max_post_delta_e00:.2f}")
+
+    st.dataframe(fit.qc, use_container_width=True)
+
+    if fit.mean_post_delta_e00 >= fit.mean_pre_delta_e00:
+        st.warning(
+            "Calibration did not improve the target-patch error. Do not use this matrix for validation."
+        )
+    elif fit.mean_post_delta_e00 > 2.0:
+        st.warning(
+            "Residual calibration error is still high. Check exposure, glare, patch coordinates, "
+            "target reference values, and session consistency before using this matrix."
+        )
+    else:
+        st.success(
+            "Target-patch fit improved. Freeze this matrix and verify it on independent check patches "
+            "before applying it to the Rayplicker validation set."
+        )
+
+    matrix_df = matrix_to_dataframe(fit.matrix)
+    st.dataframe(matrix_df, use_container_width=True)
+    st.download_button(
+        "Download session calibration matrix",
+        data=matrix_df.to_csv(index=False).encode("utf-8"),
+        file_name="session_calibration_matrix.csv",
+        mime="text/csv",
+    )
+    st.download_button(
+        "Download calibration QC table",
+        data=fit.qc.to_csv(index=False).encode("utf-8"),
+        file_name="session_calibration_qc.csv",
+        mime="text/csv",
+    )
+
+
 def protocol_page():
-    st.header("3. Frozen research protocol")
+    st.header("4. Frozen research protocol")
     st.markdown(
         """
 **Primary reference:** averaged Rayplicker CIELAB measurements.
@@ -465,12 +583,14 @@ def protocol_page():
 
 page = st.sidebar.radio(
     "Workspace",
-    ["Single image", "Paired validation", "Protocol"],
+    ["Single image", "Paired validation", "Calibration QC", "Protocol"],
 )
 
 if page == "Single image":
     single_image_page()
 elif page == "Paired validation":
     batch_validation_page()
+elif page == "Calibration QC":
+    calibration_page()
 else:
     protocol_page()
