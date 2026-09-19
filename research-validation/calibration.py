@@ -174,3 +174,24 @@ def robust_lab_calibrated(
         n_pixels=int(usable.shape[0]),
         method=f"session_calibrated_trimmed_mean_{trim:g}pct",
     )
+
+
+def thirds_analysis_calibrated(
+    image: Image.Image,
+    matrix: np.ndarray,
+    incisal_at_top: bool = False,
+    trim_percent: float = 5.0,
+) -> dict[str, LabResult]:
+    """Analyze cervical, middle, and incisal thirds using one frozen session matrix."""
+    w, h = image.size
+    cuts = [0, h // 3, (2 * h) // 3, h]
+    parts = [
+        image.crop((0, cuts[0], w, cuts[1])),
+        image.crop((0, cuts[1], w, cuts[2])),
+        image.crop((0, cuts[2], w, cuts[3])),
+    ]
+    names = ["incisal", "middle", "cervical"] if incisal_at_top else ["cervical", "middle", "incisal"]
+    return {
+        name: robust_lab_calibrated(part, matrix, trim_percent=trim_percent)
+        for name, part in zip(names, parts)
+    }
