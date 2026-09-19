@@ -23,6 +23,7 @@ from calibration import (
     fit_xyz_affine,
     matrix_to_dataframe,
     robust_lab_calibrated,
+    thirds_analysis_calibrated,
 )
 from validation_stats import bland_altman, concordance_correlation_coefficient, mae, rmse
 
@@ -148,19 +149,19 @@ def single_image_page():
         )
 
     trim = st.slider("Trim extreme LAB pixels (%)", 0.0, 15.0, 5.0, 0.5)
+    calibration_matrix = None
     if calibration_file is not None:
         try:
             calibration_matrix = dataframe_to_matrix(pd.read_csv(calibration_file))
-            result = robust_lab_calibrated(roi, calibration_matrix, trim_percent=trim)
         except Exception as exc:
             st.error(f"Calibration matrix could not be applied: {exc}")
             return
-    else:
-        result = (
-            robust_lab_calibrated(roi, calibration_matrix, trim_percent=trim)
-            if calibration_matrix is not None
-            else robust_lab(roi, trim_percent=trim)
-        )
+
+    result = (
+        robust_lab_calibrated(roi, calibration_matrix, trim_percent=trim)
+        if calibration_matrix is not None
+        else robust_lab(roi, trim_percent=trim)
+    )
 
     c1, c2 = st.columns([1, 1])
     with c1:
@@ -176,7 +177,13 @@ def single_image_page():
         horizontal=True,
         help="Needed to label cervical / middle / incisal thirds correctly.",
     ) == "Top"
-    thirds = thirds_analysis(roi, incisal_at_top=incisal_top, trim_percent=trim)
+    thirds = (
+        thirds_analysis_calibrated(
+            roi, calibration_matrix, incisal_at_top=incisal_top, trim_percent=trim
+        )
+        if calibration_matrix is not None
+        else thirds_analysis(roi, incisal_at_top=incisal_top, trim_percent=trim)
+    )
     thirds_df = pd.DataFrame(
         [
             {"region": name, "L*": r.L, "a*": r.a, "b*": r.b}
@@ -281,7 +288,11 @@ def batch_validation_page():
         patient_id, tooth_fdi, timepoint = key
         img = Image.open(uploaded).convert("RGB")
         roi = center_crop(img, center_fraction)
-        result = robust_lab(roi, trim_percent=trim)
+        result = (
+            robust_lab_calibrated(roi, calibration_matrix, trim_percent=trim)
+            if calibration_matrix is not None
+            else robust_lab(roi, trim_percent=trim)
+        )
 
         row = {
             "patient_id": patient_id,
