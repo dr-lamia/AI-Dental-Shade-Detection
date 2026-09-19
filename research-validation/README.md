@@ -26,6 +26,7 @@ This branch removes those shortcuts.
 - CIEDE2000 (ΔE00)
 - optional measured shade-guide reference table
 - batch pairing of clinical photographs with Rayplicker reference rows
+- session-level multi-patch color calibration QC
 - L*, a*, b* MAE and RMSE
 - Lin concordance correlation coefficient
 - Bland–Altman plots
@@ -92,3 +93,17 @@ The LAB coordinates should be measured from the actual physical shade guide unde
 ## Status
 
 **v1.0 research scaffold** — ready for de-identified T0/T4 paired validation after image-to-tooth mapping.
+
+
+## Session calibration workflow
+
+For a prospective or repeat session:
+
+1. Lock camera body, macro lens, flash, aperture, shutter speed, ISO, white balance, distance, and magnification.
+2. Photograph a multi-patch color reference under the same optical setup.
+3. On the **Calibration QC** page, upload that image and a patch-specification CSV containing normalized patch boxes and reference CIELAB values.
+4. Inspect the pre/post patch ΔE00 QC.
+5. Freeze the exported session matrix before viewing the Rayplicker validation results.
+6. Apply that matrix only to clinical images from the same session.
+
+The supplied historical thesis photographs reviewed so far do not contain a visible calibration target, and sampled P1 images show exposure-setting changes within the same dated session. Accordingly, the historical photographs remain a feasibility dataset unless an in-session reference image can be recovered.
