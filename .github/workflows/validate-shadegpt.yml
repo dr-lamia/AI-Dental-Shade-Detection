@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [research-validation-v1]
+    branches: [main, research-validation-v1]
 
 jobs:
   test:
@@ -54,6 +54,27 @@ jobs:
           assert set(mapped["shade"]) <= {"2M2","3M1","4M1"}
           print("shade_engine smoke test passed")
           PY
+
+      - name: Smoke-test standalone runner
+        run: |
+          cd streamlit-ai-dental-app
+          python - <<'PY'
+          import numpy as np
+          import pandas as pd
+          from PIL import Image
+
+          Image.fromarray(np.full((160, 120, 3), [210, 190, 160], dtype=np.uint8)).save("/tmp/tooth.png")
+          pd.DataFrame([
+              {"shade":"2M2","L":78.0,"a":3.0,"b":18.0},
+              {"shade":"3M1","L":73.0,"a":4.0,"b":20.0},
+              {"shade":"4M1","L":68.0,"a":5.0,"b":22.0},
+          ]).to_csv("/tmp/refs.csv", index=False)
+          PY
+          python standalone_runner.py --image /tmp/tooth.png --reference /tmp/refs.csv --output-dir /tmp/standalone
+          test -f /tmp/standalone/result.json
+          test -f /tmp/standalone/overall_result.csv
+          test -f /tmp/standalone/shade_map.csv
+          test -f /tmp/standalone/shade_map.png
 
       - name: Start Streamlit app
         run: |
