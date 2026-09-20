@@ -1,0 +1,5 @@
+case_id,method,predicted_shade,pred_L,pred_a,pred_b
+P1_11_T0,ShadeGPT calibrated,2M2,75.0,-0.2,14.9
+P1_11_T0,Random Forest,2M2,75.2,-0.1,15.0
+P1_11_T0,RBF-SVM,2M2,75.3,0.0,14.7
+P1_11_T0,Direct-image PLS,,75.1,-0.2,14.8
