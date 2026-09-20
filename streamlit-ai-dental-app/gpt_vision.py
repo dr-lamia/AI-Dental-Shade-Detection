@@ -48,9 +48,9 @@ def extract_json_object(text: str) -> dict:
         raise ValueError("The model returned an empty response.")
 
     cleaned = text.strip()
-    cleaned = re.sub(r"^\\`\\`\\`json", "", cleaned, flags=re.I).strip()
-    cleaned = re.sub(r"^\\`\\`\\`", "", cleaned).strip()
-    cleaned = re.sub(r"\\`\\`\\`$", "", cleaned).strip()
+    cleaned = re.sub(r"^```json", "", cleaned, flags=re.I).strip()
+    cleaned = re.sub(r"^```", "", cleaned).strip()
+    cleaned = re.sub(r"```$", "", cleaned).strip()
 
     match = re.search(r"\\{.*\\}", cleaned, flags=re.S)
     if not match:
