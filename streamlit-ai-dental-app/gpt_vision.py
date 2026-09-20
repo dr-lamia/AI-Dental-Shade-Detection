@@ -52,7 +52,7 @@ def extract_json_object(text: str) -> dict:
     cleaned = re.sub(r"^```", "", cleaned).strip()
     cleaned = re.sub(r"```$", "", cleaned).strip()
 
-    match = re.search(r"\\{.*\\}", cleaned, flags=re.S)
+    match = re.search(r"\{.*\}", cleaned, flags=re.S)
     if not match:
         raise ValueError("No JSON object was found in the model response.")
     return json.loads(match.group(0))
