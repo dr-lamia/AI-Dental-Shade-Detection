@@ -107,3 +107,71 @@ For a prospective or repeat session:
 6. Apply that matrix only to clinical images from the same session.
 
 The supplied historical thesis photographs reviewed so far do not contain a visible calibration target, and sampled P1 images show exposure-setting changes within the same dated session. Accordingly, the historical photographs remain a feasibility dataset unless an in-session reference image can be recovered.
+
+
+## GPT Vision repeated batch benchmark
+
+The research-validation folder now includes a blinded repeated GPT Vision comparator:
+
+`gpt_vision_batch_benchmark.py`
+
+The runner sends only the de-identified tooth ROI to the vision model. Rayplicker values and other model predictions remain hidden until after inference.
+
+### Inputs
+
+Create a private manifest using `gpt_batch_manifest_template.csv`:
+
+```text
+case_id,image_path,patient_id,tooth_fdi,timepoint,ray_shade,ray_L,ray_a,ray_b
+```
+
+Clinical images and the completed private manifest should remain outside the public repository.
+
+Optional case-matched predictions from ShadeGPT, Random Forest, RBF-SVM, or PLS can be supplied using `model_predictions_template.csv`:
+
+```text
+case_id,method,predicted_shade,pred_L,pred_a,pred_b
+```
+
+Only rows with an explicit matching `case_id` are merged. Results from a different dataset are not aligned by row number.
+
+### Dry-run validation
+
+```bash
+cd research-validation
+python gpt_vision_batch_benchmark.py \
+  --manifest /private/path/gpt_17_manifest.csv \
+  --image-root /private/path/tooth_crops \
+  --output-dir /private/path/gpt_results \
+  --dry-run
+```
+
+### Run 3 repeated blinded predictions per tooth
+
+Set the API key in the local environment; never commit it:
+
+```bash
+export OPENAI_API_KEY="..."
+export OPENAI_VISION_MODEL="gpt-5.6-luna"
+
+python gpt_vision_batch_benchmark.py \
+  --manifest /private/path/gpt_17_manifest.csv \
+  --image-root /private/path/tooth_crops \
+  --external-predictions /private/path/case_matched_model_predictions.csv \
+  --output-dir /private/path/gpt_results \
+  --repeats 3
+```
+
+The runner checkpoints after every API call and resumes completed successful case/run pairs by default.
+
+### Outputs
+
+- `gpt_vision_runs.csv` — every repeated GPT prediction and quality flag.
+- `raw_gpt_json/` — raw response retained for every call.
+- `gpt_case_summary.csv` — consensus shade, repeatability, confidence and Rayplicker agreement.
+- `gpt_repeatability_summary.csv` — overall repeated-run stability.
+- `case_level_method_comparison.csv` — same-case GPT and optional other-model predictions.
+- `method_summary.csv` — method-level agreement and ΔE00 summaries.
+- `run_metadata.json` — exact model, repeat count and input provenance.
+
+See `GPT_VISION_BATCH_PROTOCOL.md` for the locked analysis rules and endpoint definitions.
