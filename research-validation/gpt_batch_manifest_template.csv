@@ -1,0 +1,2 @@
+case_id,image_path,patient_id,tooth_fdi,timepoint,ray_shade,ray_L,ray_a,ray_b
+P1_11_T0,P1_11_T0.jpg,P1,11,T0,2M2,75.1,-0.1,14.8
