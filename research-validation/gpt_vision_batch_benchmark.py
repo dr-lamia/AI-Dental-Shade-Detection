@@ -455,9 +455,21 @@ def build_method_comparison(
         pred_L = pd.to_numeric(sub["pred_L"], errors="coerce")
         pred_a = pd.to_numeric(sub["pred_a"], errors="coerce")
         pred_b = pd.to_numeric(sub["pred_b"], errors="coerce")
-        ray_L = pd.to_numeric(sub.get("ray_L"), errors="coerce")
-        ray_a = pd.to_numeric(sub.get("ray_a"), errors="coerce")
-        ray_b = pd.to_numeric(sub.get("ray_b"), errors="coerce")
+        ray_L = (
+            pd.to_numeric(sub["ray_L"], errors="coerce")
+            if "ray_L" in sub.columns
+            else pd.Series(np.nan, index=sub.index, dtype=float)
+        )
+        ray_a = (
+            pd.to_numeric(sub["ray_a"], errors="coerce")
+            if "ray_a" in sub.columns
+            else pd.Series(np.nan, index=sub.index, dtype=float)
+        )
+        ray_b = (
+            pd.to_numeric(sub["ray_b"], errors="coerce")
+            if "ray_b" in sub.columns
+            else pd.Series(np.nan, index=sub.index, dtype=float)
+        )
 
         lab_mask = (
             pred_L.notna() & pred_a.notna() & pred_b.notna()
