@@ -19,7 +19,7 @@ No tooth-shade classifier is trained in the current app.
 - Added handling for **true cross-polarized photographs** and specular-highlight suppression for ordinary photographs.
 - Added **3-zone, 9-zone and detailed regional shade maps**, conceptually following the regional mapping workflow used by Rayplicker.
 - Added top-3 nearest 3D-Master references.
-- Added optional ChatGPT explanation. ChatGPT explains the deterministic result; it does not assign the shade.
+- Added an optional **GPT Vision independent visual comparator** that receives only the tooth ROI and selects one VITA 3D-Master shade from the allowed list. It does not replace or modify the deterministic shade engine.\n- Retained the separate optional ChatGPT explanation layer for dentist- or patient-facing interpretation.
 - Retained before/after ΔE00 comparison and PDF reporting.
 
 ## VITA 3D-Master reference library
@@ -53,16 +53,24 @@ The app supports:
 
 For a definitive clinical validation, photograph a color target under the same camera/flash/exposure/white-balance geometry as the tooth photograph.
 
-## ChatGPT
+## ChatGPT / GPT Vision
 
-If `OPENAI_API_KEY` is configured in Streamlit secrets, the app can produce a dentist- or patient-facing explanation of the already-computed CIELAB, ΔE00 and shade map.
+If `OPENAI_API_KEY` is configured in Streamlit secrets, the app exposes two separate optional OpenAI roles:
 
-Optional:
+1. **Independent GPT Vision comparator:** the model receives only the selected tooth ROI and must choose one permitted VITA 3D-Master shade. It does not receive calibrated CIELAB, CIEDE2000, Rayplicker values, or predictions from other models.
+2. **Explanation layer:** the model explains the already-computed deterministic CIELAB, ΔE00 and shade-map result for a dentist or patient.
+
+The app reports agreement/disagreement between the GPT visual shade and the calibrated deterministic shade. When a VITA reference table is available, it also reports ΔE00 between the CIELAB coordinates of the GPT-selected VITA tab and the calibrated tooth CIELAB. This does **not** mean GPT directly measures L*, a*, or b*.
+
+Optional Streamlit secrets:
 
 ```toml
 OPENAI_API_KEY = "..."
 OPENAI_MODEL = "gpt-5.6-luna"
+OPENAI_VISION_MODEL = "gpt-5.6-luna"
 ```
+
+If `OPENAI_VISION_MODEL` is omitted, the app falls back to `OPENAI_MODEL`.
 
 ## Run
 
