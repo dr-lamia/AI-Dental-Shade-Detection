@@ -50,7 +50,11 @@ except Exception:
 def parse_args():
     p = argparse.ArgumentParser(description="Run ShadeGPT color analysis without Streamlit.")
     p.add_argument("--image", required=True, help="Clinical tooth photograph.")
-    p.add_argument("--reference", required=False, help="CSV with shade,L,a,b.")
+    p.add_argument(
+        "--reference",
+        required=False,
+        help="CSV with shade,L,a,b. If omitted, uses the bundled published 26-shade VITA 3D-Master reference set.",
+    )
     p.add_argument(
         "--roi",
         nargs=4,
@@ -182,8 +186,13 @@ def main():
     }
 
     refs = None
-    if args.reference:
-        refs = validate_reference_table(pd.read_csv(args.reference))
+    reference_path = args.reference
+    if reference_path is None:
+        reference_path = str(Path(__file__).with_name("vita_3d_master_reference_published.csv"))
+
+    if reference_path:
+        refs = validate_reference_table(pd.read_csv(reference_path))
+        summary["reference_table"] = reference_path
         top3 = nearest_shades(overall.array(), refs, top_k=3)
         summary["best_shade"] = str(top3.iloc[0]["shade"])
         summary["best_shade_delta_e00"] = float(top3.iloc[0]["delta_e00"])
