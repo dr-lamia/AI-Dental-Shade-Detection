@@ -87,3 +87,22 @@ The repository also contains `research-validation/`, which performs paired agree
 ## Important methodological point
 
 The current upgraded clinical app is **not trained on the shade labels of the two thesis patients**. Shade assignment is based on calibrated CIELAB values and nearest-reference matching with CIEDE2000.
+
+
+### Private batch research benchmark
+
+The Streamlit app includes a protected **Batch research benchmark** workspace for repeated GPT Vision evaluation. It uses the same server-side `OPENAI_API_KEY` already configured for the app, so the API key is never uploaded through the research interface.
+
+To enable the protected page, add one additional Streamlit secret of your choice:
+
+```toml
+RESEARCH_BENCHMARK_PASSWORD = "choose-a-private-passphrase"
+```
+
+The page accepts:
+- a private ZIP containing de-identified tooth crops;
+- the private manifest CSV;
+- an optional same-case RF/SVM/PLS/ShadeGPT prediction CSV;
+- an optional VITA 3D-Master reference CSV.
+
+The default is 3 repeated GPT Vision calls per case. Results remain in the active Streamlit session until downloaded and are not committed to GitHub.
