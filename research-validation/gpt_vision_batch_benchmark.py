@@ -452,6 +452,18 @@ def build_method_comparison(
         lab_de = pd.to_numeric(sub["delta_e00_pred_lab_vs_ray"], errors="coerce")
         tab_de = pd.to_numeric(sub["delta_e00_selected_tab_vs_ray"], errors="coerce")
 
+        pred_L = pd.to_numeric(sub["pred_L"], errors="coerce")
+        pred_a = pd.to_numeric(sub["pred_a"], errors="coerce")
+        pred_b = pd.to_numeric(sub["pred_b"], errors="coerce")
+        ray_L = pd.to_numeric(sub.get("ray_L"), errors="coerce")
+        ray_a = pd.to_numeric(sub.get("ray_a"), errors="coerce")
+        ray_b = pd.to_numeric(sub.get("ray_b"), errors="coerce")
+
+        lab_mask = (
+            pred_L.notna() & pred_a.notna() & pred_b.notna()
+            & ray_L.notna() & ray_a.notna() & ray_b.notna()
+        )
+
         metric_rows.append(
             {
                 "method": method,
@@ -460,7 +472,19 @@ def build_method_comparison(
                 "exact_shade_accuracy": (
                     float(exact.dropna().mean()) if exact.notna().any() else np.nan
                 ),
-                "n_direct_lab_evaluable": int(lab_de.notna().sum()),
+                "n_direct_lab_evaluable": int(lab_mask.sum()),
+                "L_MAE": (
+                    float((pred_L[lab_mask] - ray_L[lab_mask]).abs().mean())
+                    if lab_mask.any() else np.nan
+                ),
+                "a_MAE": (
+                    float((pred_a[lab_mask] - ray_a[lab_mask]).abs().mean())
+                    if lab_mask.any() else np.nan
+                ),
+                "b_MAE": (
+                    float((pred_b[lab_mask] - ray_b[lab_mask]).abs().mean())
+                    if lab_mask.any() else np.nan
+                ),
                 "mean_delta_e00_pred_lab_vs_ray": (
                     float(lab_de.dropna().mean()) if lab_de.notna().any() else np.nan
                 ),
