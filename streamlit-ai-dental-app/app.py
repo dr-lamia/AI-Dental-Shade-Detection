@@ -11,6 +11,11 @@ from PIL import Image
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 
+from gpt_vision import (
+    ALLOWED_3D_MASTER_SHADES,
+    estimate_visual_shade,
+    normalize_shade_name,
+)
 from shade_engine import (
     build_reference_centroids,
     crop_fraction,
@@ -97,7 +102,16 @@ def make_shade_map_figure(roi: Image.Image, table: pd.DataFrame, mode: str):
     return fig
 
 
-def generate_pdf_report(overall, best_shade, top3, map_table, calibration_mode, polarization_mode, delta_e=None):
+def generate_pdf_report(
+    overall,
+    best_shade,
+    top3,
+    map_table,
+    calibration_mode,
+    polarization_mode,
+    delta_e=None,
+    gpt_result=None,
+):
     buffer = BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
     y = 810
@@ -135,6 +149,39 @@ def generate_pdf_report(overall, best_shade, top3, map_table, calibration_mode, 
         c.setFont("Helvetica", 10)
         for _, r in top3.iterrows():
             c.drawString(70, y, f'{r["shade"]}: DeltaE00 {r["delta_e00"]:.2f}')
+            y -= 16
+
+    if gpt_result is not None:
+        y -= 8
+        c.setFont("Helvetica-Bold", 12)
+        c.drawString(55, y, "GPT Vision independent visual estimate")
+        y -= 18
+        c.setFont("Helvetica", 10)
+        c.drawString(70, y, f'Predicted shade: {gpt_result.get("predicted_shade", "N/A")}')
+        y -= 16
+        confidence = gpt_result.get("confidence_percent")
+        confidence_text = f"{confidence}%" if confidence is not None else "N/A"
+        c.drawString(70, y, f"Model-reported confidence: {confidence_text}")
+        y -= 16
+        c.drawString(70, y, f'Image quality: {gpt_result.get("image_quality", "N/A")}')
+        y -= 16
+        c.drawString(70, y, f'Glare: {gpt_result.get("glare", "N/A")}')
+        y -= 16
+        c.drawString(70, y, f'Blur: {gpt_result.get("blur", "N/A")}')
+        y -= 16
+        c.drawString(70, y, f'Exposure: {gpt_result.get("exposure", "N/A")}')
+        y -= 16
+        if gpt_result.get("agreement_with_calibrated") is not None:
+            agreement_text = "Yes" if gpt_result["agreement_with_calibrated"] else "No"
+            c.drawString(70, y, f"Agreement with calibrated shade: {agreement_text}")
+            y -= 16
+        if gpt_result.get("gpt_tab_vs_calibrated_delta_e00") is not None:
+            c.drawString(
+                70,
+                y,
+                "DeltaE00, GPT-selected VITA tab vs calibrated tooth Lab: "
+                f'{gpt_result["gpt_tab_vs_calibrated_delta_e00"]:.2f}',
+            )
             y -= 16
 
     if map_table is not None and not map_table.empty:
@@ -400,7 +447,180 @@ def analyze_page():
         delta_prev = delta_e00(st.session_state["prev_lab"], overall.array())
         st.metric("ΔE00 vs saved previous image", f"{delta_prev:.2f}")
 
-    st.subheader("6. Optional ChatGPT explanation")
+    st.subheader("6. GPT Vision independent visual estimate")
+    st.caption(
+        "This is an additional multimodal-AI comparison arm. GPT receives the tooth ROI only; "
+        "it does not receive the calibrated CIELAB result, CIEDE2000 result, Rayplicker result, "
+        "or predictions from the other models."
+    )
+
+    gpt_language = st.selectbox(
+        "GPT Vision output language",
+        ["English", "Arabic"],
+        key="gpt_vision_language",
+    )
+
+    roi_key = (
+        uploaded.name,
+        image.size,
+        tuple(x_range),
+        tuple(y_range),
+        calibration_mode,
+        polarization_mode,
+    )
+
+    if st.button("Run GPT visual shade estimate", key="run_gpt_visual"):
+        try:
+            api_key = st.secrets["OPENAI_API_KEY"]
+            vision_model = st.secrets.get(
+                "OPENAI_VISION_MODEL",
+                st.secrets.get("OPENAI_MODEL", "gpt-5.6-luna"),
+            )
+            allowed_shades = (
+                refs["shade"].astype(str).tolist()
+                if refs is not None
+                else ALLOWED_3D_MASTER_SHADES
+            )
+            with st.spinner("Running independent GPT Vision estimate..."):
+                result = estimate_visual_shade(
+                    image=roi,
+                    api_key=api_key,
+                    model=vision_model,
+                    allowed_shades=allowed_shades,
+                    language=gpt_language,
+                )
+            st.session_state["gpt_visual_result"] = result
+            st.session_state["gpt_visual_roi_key"] = roi_key
+        except Exception as exc:
+            st.session_state["gpt_visual_result"] = None
+            st.session_state["gpt_visual_roi_key"] = None
+            st.warning(str(exc))
+
+    gpt_result = None
+    if st.session_state.get("gpt_visual_roi_key") == roi_key:
+        gpt_result = st.session_state.get("gpt_visual_result")
+
+    if gpt_result is not None:
+        gpt_result = dict(gpt_result)
+
+        c1, c2 = st.columns(2)
+        with c1:
+            st.metric("GPT visual shade", gpt_result["predicted_shade"])
+        with c2:
+            confidence = gpt_result.get("confidence_percent")
+            st.metric(
+                "Model-reported confidence",
+                f"{confidence}%" if confidence is not None else "N/A",
+            )
+
+        st.caption(
+            f'Vision model: {gpt_result.get("model", "N/A")} · '
+            "Confidence is model-reported and is not a calibrated probability."
+        )
+
+        gpt_tab_vs_calibrated_delta_e00 = None
+        agreement_with_calibrated = None
+
+        if best_shade is not None:
+            agreement_with_calibrated = (
+                normalize_shade_name(gpt_result["predicted_shade"])
+                == normalize_shade_name(best_shade)
+            )
+            if agreement_with_calibrated:
+                st.success(
+                    "GPT visual estimate agrees with the calibrated deterministic shade: "
+                    f"**{best_shade}**."
+                )
+            else:
+                st.warning(
+                    "GPT visual estimate differs from the calibrated deterministic shade: "
+                    f"calibrated **{best_shade}** vs GPT **{gpt_result['predicted_shade']}**."
+                )
+
+        if refs is not None:
+            refs_for_gpt = refs.copy()
+            refs_for_gpt["shade_norm"] = refs_for_gpt["shade"].astype(str).apply(
+                normalize_shade_name
+            )
+            selected = refs_for_gpt.loc[
+                refs_for_gpt["shade_norm"]
+                == normalize_shade_name(gpt_result["predicted_shade"])
+            ]
+            if not selected.empty:
+                ref_lab = selected.iloc[0][["L", "a", "b"]].to_numpy(dtype=float)
+                gpt_tab_vs_calibrated_delta_e00 = delta_e00(
+                    ref_lab,
+                    overall.array(),
+                )
+                st.metric(
+                    "ΔE00: GPT-selected VITA tab vs calibrated tooth Lab",
+                    f"{gpt_tab_vs_calibrated_delta_e00:.2f}",
+                )
+                st.caption(
+                    "This ΔE00 represents the published/measured CIELAB coordinates of the "
+                    "VITA tab selected by GPT versus the calibrated tooth CIELAB. It does not "
+                    "mean GPT directly measured L*, a*, or b*."
+                )
+
+        gpt_result["agreement_with_calibrated"] = agreement_with_calibrated
+        gpt_result["gpt_tab_vs_calibrated_delta_e00"] = (
+            gpt_tab_vs_calibrated_delta_e00
+        )
+
+        gpt_display = pd.DataFrame(
+            [
+                {
+                    "GPT shade": gpt_result["predicted_shade"],
+                    "Model-reported confidence (%)": gpt_result.get(
+                        "confidence_percent"
+                    ),
+                    "Image quality": gpt_result.get("image_quality"),
+                    "Glare": gpt_result.get("glare"),
+                    "Blur": gpt_result.get("blur"),
+                    "Exposure": gpt_result.get("exposure"),
+                    "Cervical/middle/incisal variation": gpt_result.get(
+                        "cervical_middle_incisal_variation"
+                    ),
+                    "Notes": gpt_result.get("notes"),
+                }
+            ]
+        )
+        st.dataframe(gpt_display, use_container_width=True, hide_index=True)
+
+        comparison_row = pd.DataFrame(
+            [
+                {
+                    "calibrated_vita_shade": best_shade,
+                    "calibrated_L": overall.L,
+                    "calibrated_a": overall.a,
+                    "calibrated_b": overall.b,
+                    "gpt_model": gpt_result.get("model"),
+                    "gpt_visual_shade": gpt_result["predicted_shade"],
+                    "gpt_confidence_percent": gpt_result.get(
+                        "confidence_percent"
+                    ),
+                    "gpt_agrees_with_calibrated": agreement_with_calibrated,
+                    "gpt_tab_vs_calibrated_delta_e00": (
+                        gpt_tab_vs_calibrated_delta_e00
+                    ),
+                    "image_quality": gpt_result.get("image_quality"),
+                    "glare": gpt_result.get("glare"),
+                    "blur": gpt_result.get("blur"),
+                    "exposure": gpt_result.get("exposure"),
+                }
+            ]
+        )
+        st.download_button(
+            "Download GPT comparison row",
+            data=comparison_row.to_csv(index=False).encode("utf-8"),
+            file_name="shadegpt_gpt_vision_comparison.csv",
+            mime="text/csv",
+        )
+
+        with st.expander("Show raw GPT JSON response"):
+            st.code(gpt_result.get("raw_response", ""), language="json")
+
+    st.subheader("7. Optional ChatGPT explanation")
     audience = st.selectbox("Audience", ["Dentist", "Patient"])
     language = st.selectbox("Language", ["English", "Arabic"])
     if st.button("Explain this result with ChatGPT"):
@@ -418,7 +638,7 @@ def analyze_page():
         else:
             st.write(text)
 
-    st.subheader("7. Report")
+    st.subheader("8. Report")
     pdf = generate_pdf_report(
         overall,
         best_shade,
@@ -427,6 +647,7 @@ def analyze_page():
         calibration_mode,
         polarization_mode,
         delta_prev,
+        gpt_result,
     )
     st.download_button(
         "📄 Download PDF report",
@@ -585,8 +806,17 @@ or dense regional maps.
 
 ### ChatGPT
 
-ChatGPT is optional and is used only to explain the already-computed result. It does not decide
-the shade and does not modify L*, a*, b*, ΔE00, or the regional map.
+ChatGPT now has two clearly separated optional roles:
+
+1. **Independent visual comparator:** GPT receives only the tooth ROI and must choose one
+   VITA 3D-Master shade from the allowed list. It does not receive calibrated CIELAB,
+   CIEDE2000, Rayplicker, or other-model results. This is a visual estimate rather than a
+   spectrophotometric measurement.
+2. **Explanation layer:** GPT may explain the already-computed deterministic result for a
+   dentist or patient.
+
+The calibrated CIELAB → CIEDE2000 → VITA mapping remains the primary deterministic shade
+engine. GPT does not modify L*, a*, b*, ΔE00, or the regional map.
 
 ### Validation
 
