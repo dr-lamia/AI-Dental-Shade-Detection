@@ -11,6 +11,7 @@ from PIL import Image
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 
+from batch_research_page import render_batch_research_page
 from gpt_vision import (
     ALLOWED_3D_MASTER_SHADES,
     estimate_visual_shade,
@@ -51,7 +52,7 @@ with st.sidebar:
     st.markdown(f"**{APP_VERSION}**")
     page = st.radio(
         "Workspace",
-        ["Analyze tooth", "Build calibration", "Build shade reference", "Method"],
+        ["Analyze tooth", "Build calibration", "Build shade reference", "Batch research benchmark", "Method"],
     )
     st.divider()
     st.caption("Research/educational use. Clinical deployment requires independent validation.")
@@ -833,5 +834,7 @@ elif page == "Build calibration":
     calibration_page()
 elif page == "Build shade reference":
     reference_page()
+elif page == "Batch research benchmark":
+    render_batch_research_page()
 else:
     method_page()
