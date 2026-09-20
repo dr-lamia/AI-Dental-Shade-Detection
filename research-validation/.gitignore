@@ -6,3 +6,17 @@ data/private/
 data/raw/
 *.xlsx
 *.xls
+
+# GPT Vision private batch inputs/outputs
+gpt_vision_batch_output/
+gpt_results/
+raw_gpt_json/
+*_Private_Manifest*.csv
+*gpt_17_manifest*.csv
+*case_matched_model_predictions*.csv
+gpt_vision_runs.csv
+gpt_case_summary.csv
+gpt_repeatability_summary.csv
+case_level_method_comparison.csv
+method_summary.csv
+run_metadata.json
