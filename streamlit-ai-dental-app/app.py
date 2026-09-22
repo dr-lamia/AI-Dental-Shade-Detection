@@ -12,6 +12,7 @@ from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 
 from batch_research_page import render_batch_research_page
+from vlm_lab_research_page import render_vlm_lab_research_page
 from gpt_vision import (
     ALLOWED_3D_MASTER_SHADES,
     estimate_visual_shade,
@@ -836,5 +837,7 @@ elif page == "Build shade reference":
     reference_page()
 elif page == "Batch research benchmark":
     render_batch_research_page()
+elif page == "VLM Lab benchmark":
+    render_vlm_lab_research_page()
 else:
     method_page()
