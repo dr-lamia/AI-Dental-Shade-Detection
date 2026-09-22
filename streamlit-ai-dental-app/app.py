@@ -52,7 +52,7 @@ with st.sidebar:
     st.markdown(f"**{APP_VERSION}**")
     page = st.radio(
         "Workspace",
-        ["Analyze tooth", "Build calibration", "Build shade reference", "Batch research benchmark", "Method"],
+        ["Analyze tooth", "Build calibration", "Build shade reference", "Batch research benchmark", "VLM Lab benchmark", "Method"],
     )
     st.divider()
     st.caption("Research/educational use. Clinical deployment requires independent validation.")
