@@ -161,3 +161,120 @@ Write descriptive fields in {language}. Return valid JSON only.
         "model": model,
         "raw_response": raw_text,
     }
+
+
+
+def estimate_visual_lab(
+    image: Image.Image,
+    api_key: str,
+    model: str = "gpt-5.6-luna",
+    language: str = "English",
+) -> dict:
+    """Return a blinded zero-shot VLM estimate of apparent tooth CIELAB.
+
+    The model receives only the tooth ROI. It is not given Rayplicker values,
+    VITA labels/reference coordinates, calibrated CIELAB, or predictions from
+    any other model. The output is an image-based estimate, not a physical
+    colorimetric measurement.
+    """
+    if OpenAI is None:
+        raise RuntimeError("The OpenAI Python package is not installed.")
+
+    system_prompt = """
+You are an independent multimodal research comparator in a dental color study.
+
+Examine only the supplied single-tooth image and estimate the tooth's apparent
+CIELAB coordinates. Do not assign a VITA shade and do not infer from any known
+reference label. You are NOT given Rayplicker measurements, VITA shade labels,
+VITA reference CIELAB values, calibrated software measurements, or predictions
+from other models.
+
+Estimate the representative tooth body color, prioritizing the middle third of
+the visible crown and excluding obvious specular highlights, deep shadows,
+gingiva, background, text, borders, and interface overlays.
+
+Use conventional CIELAB notation:
+- L_star: lightness, 0 to 100
+- a_star: red-green axis
+- b_star: yellow-blue axis
+
+Important:
+- These are visual model estimates from an image, NOT spectrophotometric
+  measurements and NOT calibrated colorimetry.
+- Do not force values to a named VITA shade.
+- Do not output a VITA shade.
+- confidence_percent is model-reported confidence in the visual CIELAB
+  estimate and is not a calibrated probability.
+- Return JSON only, with no markdown.
+
+Required JSON keys:
+L_star
+a_star
+b_star
+confidence_percent
+image_quality
+glare
+blur
+exposure
+notes
+""".strip()
+
+    user_prompt = f"""
+Estimate the representative apparent CIELAB L*, a*, b* values of this tooth ROI.
+Write descriptive fields in {language}. Return valid JSON only.
+""".strip()
+
+    client = OpenAI(api_key=api_key)
+    response = client.responses.create(
+        model=model,
+        input=[
+            {
+                "role": "system",
+                "content": [{"type": "input_text", "text": system_prompt}],
+            },
+            {
+                "role": "user",
+                "content": [
+                    {"type": "input_text", "text": user_prompt},
+                    {"type": "input_image", "image_url": pil_to_data_url(image)},
+                ],
+            },
+        ],
+    )
+
+    raw_text = response.output_text
+    parsed = extract_json_object(raw_text)
+
+    def _finite_float(name: str, lo: float, hi: float) -> float:
+        value = float(parsed.get(name))
+        if not (lo <= value <= hi):
+            raise ValueError(
+                f"Model returned {name}={value}, outside the prespecified range "
+                f"[{lo}, {hi}]."
+            )
+        return value
+
+    L_star = _finite_float("L_star", 0.0, 100.0)
+    a_star = _finite_float("a_star", -128.0, 127.0)
+    b_star = _finite_float("b_star", -128.0, 127.0)
+
+    confidence = parsed.get("confidence_percent")
+    try:
+        confidence = int(round(float(confidence)))
+        confidence = max(0, min(100, confidence))
+    except Exception:
+        confidence = None
+
+    return {
+        "pred_L": L_star,
+        "pred_a": a_star,
+        "pred_b": b_star,
+        "confidence_percent": confidence,
+        "image_quality": str(parsed.get("image_quality", "")),
+        "glare": str(parsed.get("glare", "")),
+        "blur": str(parsed.get("blur", "")),
+        "exposure": str(parsed.get("exposure", "")),
+        "notes": str(parsed.get("notes", "")),
+        "model": model,
+        "raw_response": raw_text,
+    }
